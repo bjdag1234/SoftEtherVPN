@@ -103,7 +103,7 @@ void SessionMain(SESSION *s)
 	s->LastCommTime = Tick64();
 	if (s->ServerMode == false)
 	{
-		s->NextConnectionTime = Tick64() + s->ClientOption->AdditionalConnectionInterval * (UINT64)1000;
+		s->NextConnectionTime = Tick64() + (UINT64)((UINT64)s->ClientOption->AdditionalConnectionInterval * (UINT64)1000);
 	}
 
 	s->NumConnectionsEstablished++;
@@ -900,7 +900,7 @@ void ClientAdditionalConnectChance(SESSION *s)
 				(s->NextConnectionTime <= now))
 			{
 				// Start the work to put an additional connection
-				s->NextConnectionTime = now + s->ClientOption->AdditionalConnectionInterval * (UINT64)1000U;
+				s->NextConnectionTime = now + ((UINT64)s->ClientOption->AdditionalConnectionInterval * (UINT64)1000);
 				SessionAdditionalConnect(s);
 			}
 			else
@@ -1266,14 +1266,12 @@ void CleanupSession(SESSION *s)
 	{
 		FreePacketAdapter(s->PacketAdapter);
 	}
-
 #ifdef OS_UNIX
-	if (s->NicDownOnDisconnect != NULL && *s->NicDownOnDisconnect)
+	if (s->ClientOption != NULL)
 	{
 		UnixVLanSetState(s->ClientOption->DeviceName, false);
 	}
 #endif
-
 	if (s->OldTraffic != NULL)
 	{
 		FreeTraffic(s->OldTraffic);
@@ -1292,6 +1290,8 @@ void CleanupSession(SESSION *s)
 	}
 
 	DeleteCounter(s->LoggingRecordCount);
+
+	ReleaseSharedBuffer(s->IpcSessionSharedBuffer);
 
 	Free(s);
 }
@@ -1421,14 +1421,9 @@ void ClientThread(THREAD *t, void *param)
 
 		CLog(s->Cedar->Client, "LC_CONNECT_ERROR", s->ClientOption->AccountName,
 			GetUniErrorStr(s->Err), s->Err);
-
 #ifdef OS_UNIX
-		if (s->NicDownOnDisconnect != NULL && *s->NicDownOnDisconnect)
-		{
-			UnixVLanSetState(s->ClientOption->DeviceName, false);
-		}
+		UnixVLanSetState(s->ClientOption->DeviceName, false);
 #endif
-
 		if (s->LinkModeClient && s->Link != NULL)
 		{
 			HLog(s->Link->Hub, "LH_CONNECT_ERROR", s->ClientOption->AccountName,
@@ -1836,7 +1831,7 @@ SESSION *NewRpcSessionEx2(CEDAR *cedar, CLIENT_OPTION *option, UINT *err, char *
 }
 
 // Create a client session
-SESSION *NewClientSessionEx(CEDAR *cedar, CLIENT_OPTION *option, CLIENT_AUTH *auth, PACKET_ADAPTER *pa, ACCOUNT *account, bool *NicDownOnDisconnect)
+SESSION *NewClientSessionEx(CEDAR *cedar, CLIENT_OPTION *option, CLIENT_AUTH *auth, PACKET_ADAPTER *pa, ACCOUNT *account)
 {
 	SESSION *s;
 	THREAD *t;
@@ -1964,8 +1959,6 @@ SESSION *NewClientSessionEx(CEDAR *cedar, CLIENT_OPTION *option, CLIENT_AUTH *au
 		s->ClientOption->NumRetry = 0;
 	}
 
-	s->NicDownOnDisconnect = NicDownOnDisconnect;
-
 	// Create a client thread
 	t = NewThread(ClientThread, (void *)s);
 	WaitThreadInit(t);
@@ -1973,9 +1966,9 @@ SESSION *NewClientSessionEx(CEDAR *cedar, CLIENT_OPTION *option, CLIENT_AUTH *au
 
 	return s;
 }
-SESSION *NewClientSession(CEDAR *cedar, CLIENT_OPTION *option, CLIENT_AUTH *auth, PACKET_ADAPTER *pa, bool *NicDownOnDisconnect)
+SESSION *NewClientSession(CEDAR *cedar, CLIENT_OPTION *option, CLIENT_AUTH *auth, PACKET_ADAPTER *pa)
 {
-	return NewClientSessionEx(cedar, option, auth, pa, NULL, NicDownOnDisconnect);
+	return NewClientSessionEx(cedar, option, auth, pa, NULL);
 }
 
 // Get the session from the session key
@@ -2047,9 +2040,9 @@ void if_free(SESSION *s);
 // Create a server session
 SESSION *NewServerSession(CEDAR *cedar, CONNECTION *c, HUB *h, char *username, POLICY *policy)
 {
-	return NewServerSessionEx(cedar, c, h, username, policy, false);
+	return NewServerSessionEx(cedar, c, h, username, policy, false, NULL);
 }
-SESSION *NewServerSessionEx(CEDAR *cedar, CONNECTION *c, HUB *h, char *username, POLICY *policy, bool inproc_mode)
+SESSION *NewServerSessionEx(CEDAR *cedar, CONNECTION *c, HUB *h, char *username, POLICY *policy, bool inproc_mode, UCHAR *ipc_mac_address)
 {
 	SESSION *s;
 	char name[MAX_SIZE];
@@ -2170,28 +2163,35 @@ SESSION *NewServerSessionEx(CEDAR *cedar, CONNECTION *c, HUB *h, char *username,
 	// Generate a MAC address for IPC
 	if (s->InProcMode)
 	{
-		char tmp[MAX_SIZE];
-		char machine[MAX_SIZE];
-		UCHAR hash[SHA1_SIZE];
+		if (ipc_mac_address != NULL)
+		{
+			Copy(s->IpcMacAddress, ipc_mac_address, 6);
+		}
+		else
+		{
+			char tmp[MAX_SIZE];
+			char machine[MAX_SIZE];
+			UCHAR hash[SHA1_SIZE];
 
-		GetMachineName(machine, sizeof(machine));
+			GetMachineName(machine, sizeof(machine));
 
-		Format(tmp, sizeof(tmp), "%s@%s@%u", machine, h->Name, s->UniqueId);
+			Format(tmp, sizeof(tmp), "%s@%s@%u", machine, h->Name, s->UniqueId);
 
-		StrUpper(tmp);
-		Trim(tmp);
+			StrUpper(tmp);
+			Trim(tmp);
 
-		Sha0(hash, tmp, StrLen(tmp));
+			Sha0(hash, tmp, StrLen(tmp));
 
-		s->IpcMacAddress[0] = 0xCA;
-		s->IpcMacAddress[1] = hash[1];
-		s->IpcMacAddress[2] = hash[2];
-		s->IpcMacAddress[3] = hash[3];
-		s->IpcMacAddress[4] = hash[4];
-		s->IpcMacAddress[5] = hash[5];
+			s->IpcMacAddress[0] = 0xCA;
+			s->IpcMacAddress[1] = hash[1];
+			s->IpcMacAddress[2] = hash[2];
+			s->IpcMacAddress[3] = hash[3];
+			s->IpcMacAddress[4] = hash[4];
+			s->IpcMacAddress[5] = hash[5];
 
-		MacToStr(tmp, sizeof(tmp), s->IpcMacAddress);
-		Debug("MAC Address for IPC: %s\n", tmp);
+			MacToStr(tmp, sizeof(tmp), s->IpcMacAddress);
+			Debug("MAC Address for IPC: %s\n", tmp);
+		}
 	}
 
 	return s;

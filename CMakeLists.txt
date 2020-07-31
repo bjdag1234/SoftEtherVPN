@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.7)
 
 project("SoftEther VPN"
-  VERSION 5.01.9670
+  VERSION 5.01.9674
   LANGUAGES C
 )
 
 set(TOP_DIRECTORY ${CMAKE_SOURCE_DIR})
-set(BUILD_DIRECTORY ${TOP_DIRECTORY}/build)
+set(BUILD_DIRECTORY ${CMAKE_BINARY_DIR})
 
 # We define a dedicated variable because CMAKE_BUILD_TYPE can have different
 # configurations than "Debug" and "Release", such as "RelWithDebInfo".
@@ -37,10 +37,12 @@ endif()
 
 if(UNIX)
   include(GNUInstallDirs)
-  set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 
   include(CheckIncludeFile)
   Check_Include_File(sys/auxv.h HAVE_SYS_AUXV)
+  if(EXISTS "/lib/systemd/system")
+    set(CMAKE_INSTALL_SYSTEMD_UNITDIR "/lib/systemd/system" CACHE STRING "Where to install systemd unit files")
+  endif()
 endif()
 
 configure_file("${TOP_DIRECTORY}/AUTHORS.TXT" "${TOP_DIRECTORY}/src/bin/hamcore/authors.txt" COPYONLY)
@@ -55,8 +57,6 @@ string(TIMESTAMP TIME_SECOND "%S" UTC)
 
 message(STATUS "Build date: ${DATE_DAY}/${DATE_MONTH}/${DATE_YEAR}")
 message(STATUS "Build time: ${TIME_HOUR}:${TIME_MINUTE}:${TIME_SECOND}")
-
-set(CPACK_PACKAGING_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
 
 add_subdirectory(src)
 
@@ -86,6 +86,15 @@ if(UNIX)
   set(CPACK_RPM_FILE_NAME "RPM-DEFAULT")
   set(CPACK_RPM_PACKAGE_GROUP "Applications/Internet")
   set(CPACK_RPM_PACKAGE_LICENSE "ASL 2.0")
+
+  # Exclude system directories
+  if(CPACK_GENERATOR STREQUAL "RPM")
+    execute_process(
+        COMMAND rpm -ql filesystem
+        COMMAND tr \n \;
+        OUTPUT_VARIABLE CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
+        ERROR_QUIET)
+  endif()
 
   include(CPack)
 endif()

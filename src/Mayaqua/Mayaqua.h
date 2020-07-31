@@ -8,11 +8,11 @@
 #ifndef	MAYAQUA_H
 #define	MAYAQUA_H
 
-// PenCore.dll related
-#define	PENCORE_DLL_NAME		"|PenCore.dll"
-// #define	PENCORE_DLL_NAME_X64	"|PenCore_x64.dll" // commonized to x86
-// #define	PENCORE_DLL_NAME_IA64	"|PenCore_ia64.dll" // commonized to x86
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdio.h>
 
+#define	PENCORE_DLL_NAME		"|PenCore.dll"
 
 //#define	USE_PROBE						// Use Probe
 
@@ -124,9 +124,11 @@ int PASCAL WinMain(HINSTANCE hInst, HINSTANCE hPrev, char *CmdLine, int CmdShow)
 #ifdef	OS_UNIX
 #ifndef	UNIX_SOLARIS
 #ifndef	CPU_SH4
+#if	!defined(__UCLIBC__) || defined(__UCLIBC_SUPPORT_AI_ADDRCONFIG__)
 // Getifaddrs system call is supported on UNIX other than Solaris.
 // However, it is not supported also by the Linux on SH4 CPU
 #define	MAYAQUA_SUPPORTS_GETIFADDRS
+#endif	// !UCLIBC || UCLIBC_SUPPORT_AI_ADDRCONFIG
 #endif	// CPU_SH4
 #endif	// UNIX_SOLARIS
 #endif	// OS_UNIX
@@ -157,8 +159,8 @@ int PASCAL WinMain(HINSTANCE hInst, HINSTANCE hPrev, char *CmdLine, int CmdShow)
 #ifdef	UNIX_SOLARIS
 #include <sys/filio.h>
 #endif	// UNIX_SOLARIS
-#include <sys/poll.h>
 #include <sys/resource.h>
+#include <poll.h>
 #include <pthread.h>
 #ifdef	UNIX_LINUX
 #include <sys/prctl.h>
@@ -269,6 +271,12 @@ int iconv_close (iconv_t __cd);
 
 // TCP/IP
 #include <Mayaqua/TcpIp.h>
+
+// HTTP
+#include <Mayaqua/HTTP.h>
+
+// Proxy
+#include <Mayaqua/Proxy.h>
 
 // 64 bit real-time clock
 #include <Mayaqua/Tick64.h>

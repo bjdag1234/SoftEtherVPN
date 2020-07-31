@@ -62,7 +62,7 @@ UINT num_admin_options = sizeof(admin_options) / sizeof(ADMIN_OPTION);
 
 
 // Create an EAP client for the specified Virtual Hub
-EAP_CLIENT *HubNewEapClient(CEDAR *cedar, char *hubname, char *client_ip_str, char *username)
+EAP_CLIENT *HubNewEapClient(CEDAR *cedar, char *hubname, char *client_ip_str, char *username, char *vpn_protocol_state_str)
 {
 	HUB *hub = NULL;
 	EAP_CLIENT *ret = NULL;
@@ -112,6 +112,11 @@ EAP_CLIENT *HubNewEapClient(CEDAR *cedar, char *hubname, char *client_ip_str, ch
 
 							if (eap != NULL)
 							{
+								if (IsEmptyStr(vpn_protocol_state_str) == false)
+								{
+									StrCpy(eap->In_VpnProtocolState, sizeof(eap->In_VpnProtocolState), vpn_protocol_state_str);
+								}
+
 								if (use_peap == false)
 								{
 									// EAP
@@ -1558,12 +1563,14 @@ void HubWatchDogThread(THREAD *t, void *param)
 		o2 = NewListFast(NULL);
 
 		// Send an ARP packet
-		LockList(hub->IpTable);
+		LockHashList(hub->MacHashTable);
 		{
 			num = LIST_NUM(hub->IpTable);
 			for (i = 0;i < LIST_NUM(hub->IpTable);i++)
 			{
 				IP_TABLE_ENTRY *e = LIST_DATA(hub->IpTable, i);
+
+				if (e == NULL) continue;
 
 				if ((e->UpdatedTime + (UINT64)(IP_TABLE_EXPIRE_TIME)) > Tick64())
 				{
@@ -1640,7 +1647,7 @@ void HubWatchDogThread(THREAD *t, void *param)
 				}
 			}
 		}
-		UnlockList(hub->IpTable);
+		UnlockHashList(hub->MacHashTable);
 
 		if ((LIST_NUM(o) + LIST_NUM(o2)) != 0)
 		{
@@ -5908,7 +5915,7 @@ void IntoTrafficLimiter(TRAFFIC_LIMITER *tr, PKT *p)
 	}
 
 	// Value increase
-	tr->Value += p->PacketSize * (UINT64)8;
+	tr->Value += (UINT64)p->PacketSize * (UINT64)8;
 }
 
 // The bandwidth reduction by traffic limiter

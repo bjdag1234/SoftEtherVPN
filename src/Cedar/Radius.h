@@ -9,8 +9,8 @@
 #define	RADIUS_H
 
 #define	RADIUS_DEFAULT_PORT		1812			// The default port number
-#define	RADIUS_RETRY_INTERVAL	500				// Retransmission interval
-#define	RADIUS_RETRY_TIMEOUT	(10 * 1000)		// Time-out period
+#define	RADIUS_RETRY_INTERVAL	1000				// Retransmission interval
+#define	RADIUS_RETRY_TIMEOUT	(15 * 1000)		// Time-out period, keep it 2FA friendly
 #define	RADIUS_INITIAL_EAP_TIMEOUT	1600		// Initial timeout for EAP
 
 
@@ -36,6 +36,7 @@
 #define	RADIUS_ATTRIBUTE_EAP_MESSAGE				79
 #define	RADIUS_ATTRIBUTE_EAP_AUTHENTICATOR			80
 #define	RADIUS_ATTRIBUTE_VLAN_ID					81
+#define RADIUS_ATTRIBUTE_FRAMED_INTERFACE_ID		96
 #define	RADIUS_MAX_NAS_ID_LEN						253
 
 // RADIUS codes
@@ -230,6 +231,9 @@ struct EAP_CLIENT
 	UCHAR RecvLastCode;
 
 	UINT LastRecvVLanId;
+	UCHAR LastRecvVirtualMacAddress[6];
+
+	char In_VpnProtocolState[64];
 };
 
 void FreeRadiusPacket(RADIUS_PACKET *p);
@@ -268,6 +272,8 @@ struct RADIUS_LOGIN_OPTION
 	UINT Out_VLanId;
 	bool Out_IsRadiusLogin;
 	char NasId[RADIUS_MAX_NAS_ID_LEN + 1];	// NAS-Identifier
+	char Out_VirtualMacAddress[6];
+	char In_VpnProtocolState[64];
 };
 
 // Function prototype

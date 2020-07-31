@@ -296,6 +296,7 @@ struct VH
 	UINT DhcpDns2;					// DNS server address 2
 	char DhcpDomain[MAX_HOST_NAME_LEN + 1];	// Assigned domain name
 	LIST *DhcpLeaseList;			// DHCP lease list
+	LIST *DhcpPendingLeaseList;		// Pending DHCP lease list
 	UINT64 LastDhcpPolling;			// Time which the DHCP list polled last
 	bool SaveLog;					// Save a log
 	DHCP_CLASSLESS_ROUTE_TABLE PushRoute;	// Pushing routing table
@@ -408,8 +409,6 @@ ARP_ENTRY *SearchArpTable(VH *v, UINT ip);
 void RefreshArpTable(VH *v);
 void PollingArpTable(VH *v);
 void InsertArpTable(VH *v, UCHAR *mac, UINT ip);
-bool IsMacBroadcast(UCHAR *mac);
-bool IsMacInvalid(UCHAR *mac);
 void InitArpWaitTable(VH *v);
 void FreeArpWaitTable(VH *v);
 int CompareArpWaitTable(void *p1, void *p2);
@@ -511,7 +510,9 @@ int CompareDhcpLeaseList(void *p1, void *p2);
 DHCP_LEASE *NewDhcpLease(UINT expire, UCHAR *mac_address, UINT ip, UINT mask, char *hostname);
 void FreeDhcpLease(DHCP_LEASE *d);
 DHCP_LEASE *SearchDhcpLeaseByMac(VH *v, UCHAR *mac);
+DHCP_LEASE *SearchDhcpPendingLeaseByMac(VH *v, UCHAR *mac);
 DHCP_LEASE *SearchDhcpLeaseByIp(VH *v, UINT ip);
+DHCP_LEASE *SearchDhcpPendingLeaseByIp(VH *v, UINT ip);
 UINT ServeDhcpDiscover(VH *v, UCHAR *mac, UINT request_ip);
 UINT GetFreeDhcpIpAddress(VH *v);
 UINT GetFreeDhcpIpAddressByRandom(VH *v, UCHAR *mac);
